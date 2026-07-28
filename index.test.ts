@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import {
+import openAIServiceTier, {
   DEFAULT_SUPPORTED_MODELS,
   _test,
   configPaths,
@@ -35,6 +35,15 @@ const openAIModel = {
 const codexModel = {
   provider: "openai-codex",
   id: "gpt-5.5",
+  api: "openai-codex-responses",
+  maxTokens: 128000,
+  reasoning: true,
+  thinkingLevelMap: { high: "high" },
+} as never;
+
+const codex56Model = {
+  provider: "openai-codex",
+  id: "gpt-5.6-sol",
   api: "openai-codex-responses",
   maxTokens: 128000,
   reasoning: true,
@@ -100,10 +109,20 @@ test("knows provider-specific service tier support", () => {
   assert.deepEqual([...supportedServiceTiersForModel(codexModel)], ["priority"]);
 });
 
+test("includes every GPT-5.6 variant for OpenAI and OpenAI Codex", () => {
+  const defaults = new Set<string>(DEFAULT_SUPPORTED_MODELS);
+  for (const provider of ["openai", "openai-codex"]) {
+    for (const id of ["gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"]) {
+      assert.equal(defaults.has(`${provider}/${id}`), true);
+    }
+  }
+});
+
 test("applies configured tier only when active, allow-listed, and tier-supported", () => {
   const supportedModels = parseModels(DEFAULT_SUPPORTED_MODELS) ?? [];
   assert.equal(supportsServiceTier(openAIModel, supportedModels), true);
   assert.equal(supportsServiceTier(codexModel, supportedModels), true);
+  assert.equal(supportsServiceTier(codex56Model, supportedModels), true);
   assert.equal(
     resolveServiceTierForModel(openAIModel, { active: true, serviceTier: "priority" satisfies ServiceTier }, supportedModels),
     "priority",
@@ -145,18 +164,90 @@ test("full provider options include serviceTier for Pi cost accounting", () => {
   assert.equal(options.reasoningEffort, "high");
 });
 
-test("resolveConfig creates default global config", () => {
+test("resolveConfig creates a default config without freezing the package model defaults", () => {
   const cwd = tempDir();
   const home = tempDir();
   try {
     const paths = configPaths(cwd, home);
     const config = resolveConfig(cwd, home);
+    const persisted = JSON.parse(readFileSync(paths.global, "utf8")) as Record<string, unknown>;
+
     assert.equal(existsSync(paths.global), true);
     assert.equal(config.active, false);
     assert.equal(config.serviceTier, "priority");
-    assert.equal(config.supportedModels.some((model) => model.provider === "openai" && model.id === "gpt-5.5"), true);
+    assert.equal(config.supportedModels.some((model) => model.provider === "openai" && model.id === "gpt-5.6-sol"), true);
+    assert.equal(Object.hasOwn(persisted, "supportedModels"), false);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });
   }
+});
+
+test("migrates the generated 0.1.x allow-list to package-maintained defaults", () => {
+  const cwd = tempDir();
+  const home = tempDir();
+  try {
+    const paths = configPaths(cwd, home);
+    mkdirSync(dirname(paths.global), { recursive: true });
+    writeFileSync(
+      paths.global,
+      JSON.stringify({
+        active: true,
+        serviceTier: "priority",
+        supportedModels: [
+          "openai/gpt-5.4",
+          "openai/gpt-5.5",
+          "openai-codex/gpt-5.4",
+          "openai-codex/gpt-5.5",
+        ],
+      }),
+      "utf8",
+    );
+
+    const config = resolveConfig(cwd, home);
+    const persisted = JSON.parse(readFileSync(paths.global, "utf8")) as Record<string, unknown>;
+
+    assert.equal(config.supportedModels.some((model) => model.id === "gpt-5.6-sol"), true);
+    assert.equal(Object.hasOwn(persisted, "supportedModels"), false);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("preserves a custom model allow-list", () => {
+  const cwd = tempDir();
+  const home = tempDir();
+  try {
+    const paths = configPaths(cwd, home);
+    mkdirSync(dirname(paths.global), { recursive: true });
+    writeFileSync(paths.global, JSON.stringify({ supportedModels: ["openai/gpt-5.6-sol"] }), "utf8");
+
+    const config = resolveConfig(cwd, home);
+    const persisted = JSON.parse(readFileSync(paths.global, "utf8")) as { supportedModels?: string[] };
+
+    assert.deepEqual(config.supportedModels, [{ provider: "openai", id: "gpt-5.6-sol" }]);
+    assert.deepEqual(persisted.supportedModels, ["openai/gpt-5.6-sol"]);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("overrides the built-in providers without replacing their dynamic model catalogs", () => {
+  const providers = new Map<string, { api?: string; models?: unknown }>();
+  openAIServiceTier({
+    registerFlag() {},
+    registerProvider(name: string, config: { api?: string; models?: unknown }) {
+      providers.set(name, config);
+    },
+    registerCommand() {},
+    on() {},
+  } as never);
+
+  assert.deepEqual([...providers.keys()], ["openai", "openai-codex"]);
+  assert.equal(providers.get("openai")?.api, "openai-responses");
+  assert.equal(providers.get("openai-codex")?.api, "openai-codex-responses");
+  assert.equal(Object.hasOwn(providers.get("openai") ?? {}, "models"), false);
+  assert.equal(Object.hasOwn(providers.get("openai-codex") ?? {}, "models"), false);
 });
