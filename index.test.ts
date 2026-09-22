@@ -118,6 +118,34 @@ test("includes every GPT-5.6 variant for OpenAI and OpenAI Codex", () => {
   }
 });
 
+test("supports GPT-6 Astra priority tier on OpenAI and OpenAI Codex", () => {
+  const supportedModels = parseModels(DEFAULT_SUPPORTED_MODELS) ?? [];
+  for (const provider of ["openai", "openai-codex"]) {
+    const model = {
+      provider,
+      id: "gpt-6-astra",
+      api: provider === "openai" ? "openai-responses" : "openai-codex-responses",
+    };
+    assert.equal(supportsServiceTier(model, supportedModels), true);
+    assert.equal(
+      resolveServiceTierForModel(model, { active: true, serviceTier: "priority" }, supportedModels),
+      "priority",
+    );
+    assert.equal(
+      resolveServiceTierForModel(model, { active: false, serviceTier: "priority" }, supportedModels),
+      undefined,
+    );
+    assert.equal(
+      resolveServiceTierForModel(model, { active: true, serviceTier: "priority" }, []),
+      undefined,
+    );
+    assert.equal(
+      resolveServiceTierForModel(model, { active: true, serviceTier: "flex" }, supportedModels),
+      provider === "openai" ? "flex" : undefined,
+    );
+  }
+});
+
 test("applies configured tier only when active, allow-listed, and tier-supported", () => {
   const supportedModels = parseModels(DEFAULT_SUPPORTED_MODELS) ?? [];
   assert.equal(supportsServiceTier(openAIModel, supportedModels), true);
@@ -176,6 +204,9 @@ test("resolveConfig creates a default config without freezing the package model 
     assert.equal(config.active, false);
     assert.equal(config.serviceTier, "priority");
     assert.equal(config.supportedModels.some((model) => model.provider === "openai" && model.id === "gpt-5.6-sol"), true);
+    for (const provider of ["openai", "openai-codex"]) {
+      assert.equal(config.supportedModels.some((model) => model.provider === provider && model.id === "gpt-6-astra"), true);
+    }
     assert.equal(Object.hasOwn(persisted, "supportedModels"), false);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
@@ -208,6 +239,9 @@ test("migrates the generated 0.1.x allow-list to package-maintained defaults", (
     const persisted = JSON.parse(readFileSync(paths.global, "utf8")) as Record<string, unknown>;
 
     assert.equal(config.supportedModels.some((model) => model.id === "gpt-5.6-sol"), true);
+    for (const provider of ["openai", "openai-codex"]) {
+      assert.equal(config.supportedModels.some((model) => model.provider === provider && model.id === "gpt-6-astra"), true);
+    }
     assert.equal(Object.hasOwn(persisted, "supportedModels"), false);
   } finally {
     rmSync(cwd, { recursive: true, force: true });

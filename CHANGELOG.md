@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add GPT-6 Astra (`gpt-6-astra`) to the default service-tier allow-list for OpenAI and OpenAI Codex.
 - Support Pi 0.80.8+'s dynamic provider runtime by overlaying the built-in `openai` and `openai-codex` providers without replacing their model catalogs.
 - Add cost-correct priority-tier support for GPT-5.6 Luna, Sol, and Terra on OpenAI and OpenAI Codex.
 - Move Pi imports and peer dependencies to the `@earendil-works` packages.

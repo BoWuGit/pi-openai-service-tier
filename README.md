@@ -26,7 +26,7 @@ So Pi gets both the OpenAI request field and the matching Pi-side service-tier c
 - `/openai-tier` selects `priority`, `flex`, `default`, `auto`, or `scale`.
 - Works with Pi's OpenAI Responses and OpenAI Codex Responses providers.
 - Avoids sending tiers that a provider does not support.
-- Includes `gpt-5.4`, `gpt-5.5`, and the `gpt-5.6` Luna/Sol/Terra OpenAI/Codex models by default.
+- Includes `gpt-5.4`, `gpt-5.5`, the `gpt-5.6` Luna/Sol/Terra models, and `gpt-6-astra` on OpenAI/Codex by default.
 - Preserves Pi's dynamically refreshed OpenAI and OpenAI Codex model catalogs.
 - Does **not** change model, reasoning level, prompts, tools, or `text.verbosity`.
 - Does **not** make network calls of its own.
@@ -141,6 +141,8 @@ Provider-specific tier support:
 If a tier is configured but unsupported by the current model/provider, the extension leaves `serviceTier` unset for that request instead of sending an invalid value.
 
 ## Compatibility notes
+
+GPT-6 Astra (`gpt-6-astra`) supports priority/Fast mode on both providers. OpenAI currently excludes Astra Fast mode with EU data residency; use standard processing for those requests. See [OpenAI pricing](https://developers.openai.com/api/docs/pricing).
 
 This extension overlays Pi's built-in `openai` and `openai-codex` providers without supplying a `models` array, so Pi's built-in and dynamically refreshed model catalogs remain available. It delegates back to Pi's built-in OpenAI implementations, adding `serviceTier` only for configured/supported OpenAI models.
 
