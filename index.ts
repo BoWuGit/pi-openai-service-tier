@@ -54,6 +54,7 @@ export interface ConfigFile {
   active?: boolean;
   serviceTier?: ServiceTier;
   supportedModels?: string[];
+  additionalSupportedModels?: string[];
 }
 
 export interface ResolvedConfig {
@@ -78,7 +79,7 @@ const DEFAULT_CONFIG = {
   persistState: true,
   active: false,
   serviceTier: "priority",
-} satisfies Required<Omit<ConfigFile, "supportedModels">>;
+} satisfies Required<Omit<ConfigFile, "supportedModels" | "additionalSupportedModels">>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -133,6 +134,8 @@ export function readConfig(path: string): ConfigFile | undefined {
     if (isServiceTier(parsed.serviceTier)) config.serviceTier = parsed.serviceTier;
     const supportedModels = normalizeModelKeys(parsed.supportedModels);
     if (supportedModels !== undefined) config.supportedModels = supportedModels;
+    const additionalSupportedModels = normalizeModelKeys(parsed.additionalSupportedModels);
+    if (additionalSupportedModels !== undefined) config.additionalSupportedModels = additionalSupportedModels;
     return config;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -202,7 +205,10 @@ export function resolveConfig(cwd: string, home = homedir()): ResolvedConfig {
     persistState: merged.persistState ?? DEFAULT_CONFIG.persistState,
     active: merged.active ?? DEFAULT_CONFIG.active,
     serviceTier: merged.serviceTier ?? DEFAULT_CONFIG.serviceTier,
-    supportedModels: parseModels(merged.supportedModels) ?? parseModels(DEFAULT_SUPPORTED_MODELS) ?? [],
+    supportedModels: parseModels([...new Set([
+      ...(merged.supportedModels ?? DEFAULT_SUPPORTED_MODELS),
+      ...(merged.additionalSupportedModels ?? []),
+    ])]) ?? [],
   };
 }
 

@@ -11,6 +11,7 @@ import openAIServiceTier, {
   parseModelKey,
   parseModels,
   readConfig,
+  writeConfig,
   resolveConfig,
   resolveServiceTierForModel,
   supportedServiceTiersForModel,
@@ -262,6 +263,84 @@ test("preserves a custom model allow-list", () => {
 
     assert.deepEqual(config.supportedModels, [{ provider: "openai", id: "gpt-5.6-sol" }]);
     assert.deepEqual(persisted.supportedModels, ["openai/gpt-5.6-sol"]);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("additional models extend defaults, normalize keys, and deduplicate without freezing defaults", () => {
+  const cwd = tempDir();
+  const home = tempDir();
+  try {
+    const { global } = configPaths(cwd, home);
+    mkdirSync(dirname(global), { recursive: true });
+    const additionalSupportedModels = [" openai / future-model ", "openai/future-model", "openai/gpt-6-astra", "bad", 123];
+    writeFileSync(global, JSON.stringify({ additionalSupportedModels }));
+    const config = resolveConfig(cwd, home);
+    assert.deepEqual(config.supportedModels, [
+      ...(parseModels(DEFAULT_SUPPORTED_MODELS) ?? []),
+      { provider: "openai", id: "future-model" },
+    ]);
+    assert.equal(resolveServiceTierForModel(
+      { provider: "openai", id: "future-model", api: "openai-responses" },
+      { active: true, serviceTier: "priority" },
+      config.supportedModels,
+    ), "priority");
+    assert.deepEqual(JSON.parse(readFileSync(global, "utf8")), { additionalSupportedModels });
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("additional models respect custom bases and project-over-global precedence", () => {
+  const cwd = tempDir();
+  const home = tempDir();
+  try {
+    const paths = configPaths(cwd, home);
+    mkdirSync(dirname(paths.global), { recursive: true });
+    mkdirSync(dirname(paths.project), { recursive: true });
+    writeFileSync(paths.global, JSON.stringify({
+      supportedModels: ["openai/custom-base"],
+      additionalSupportedModels: ["openai/global-extra"],
+    }));
+    assert.deepEqual(resolveConfig(cwd, home).supportedModels, parseModels(["openai/custom-base", "openai/global-extra"]));
+    writeFileSync(paths.project, JSON.stringify({ additionalSupportedModels: ["openai/project-extra"] }));
+    assert.deepEqual(resolveConfig(cwd, home).supportedModels, parseModels(["openai/custom-base", "openai/project-extra"]));
+    writeFileSync(paths.project, JSON.stringify({ additionalSupportedModels: [] }));
+    assert.deepEqual(resolveConfig(cwd, home).supportedModels, parseModels(["openai/custom-base"]));
+    writeFileSync(paths.project, JSON.stringify({ supportedModels: [], additionalSupportedModels: [] }));
+    assert.deepEqual(resolveConfig(cwd, home).supportedModels, []);
+    writeFileSync(paths.project, JSON.stringify({ supportedModels: [], additionalSupportedModels: ["openai/only-extra"] }));
+    assert.deepEqual(resolveConfig(cwd, home).supportedModels, parseModels(["openai/only-extra"]));
+    writeFileSync(paths.project, JSON.stringify({ additionalSupportedModels: "invalid" }));
+    assert.deepEqual(resolveConfig(cwd, home).supportedModels, parseModels(["openai/custom-base", "openai/global-extra"]));
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("legacy migration and config writes preserve additional models", () => {
+  const cwd = tempDir();
+  const home = tempDir();
+  try {
+    const { global } = configPaths(cwd, home);
+    mkdirSync(dirname(global), { recursive: true });
+    writeFileSync(global, JSON.stringify({
+      active: true,
+      supportedModels: ["openai/gpt-5.4", "openai/gpt-5.5", "openai-codex/gpt-5.4", "openai-codex/gpt-5.5"],
+      additionalSupportedModels: ["openai/future-model"],
+    }));
+    const config = resolveConfig(cwd, home);
+    assert.deepEqual(config.supportedModels, [
+      ...(parseModels(DEFAULT_SUPPORTED_MODELS) ?? []),
+      { provider: "openai", id: "future-model" },
+    ]);
+    assert.deepEqual(readConfig(global), { active: true, additionalSupportedModels: ["openai/future-model"] });
+    writeConfig(global, { ...readConfig(global), active: false, serviceTier: "priority" });
+    assert.deepEqual(readConfig(global)?.additionalSupportedModels, ["openai/future-model"]);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });

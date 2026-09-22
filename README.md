@@ -118,8 +118,29 @@ When `supportedModels` is omitted, the extension uses its package-maintained, co
 | `active` | boolean | `false` | Whether a service tier is active. |
 | `serviceTier` | `priority` \| `flex` \| `default` \| `auto` \| `scale` | `priority` | Service tier passed to Pi's OpenAI provider option when supported by the current provider. |
 | `supportedModels` | string[] | package-maintained list | Optional replacement allow-list of `provider/model-id` pairs that should receive `serviceTier`. |
+| `additionalSupportedModels` | string[] | `[]` | Extra exact `provider/model-id` pairs appended to the effective base list, with duplicates removed. |
 
 Set `supportedModels` only when you want to replace the package defaults. Config files containing the exact generated 0.1.x default list are migrated automatically to package-maintained defaults; custom lists remain unchanged.
+
+### Adding newly released models
+
+Prefer leaving `supportedModels` unset so plugin updates can add verified models automatically. To opt into a model before it is included in the package defaults, add it to `additionalSupportedModels`:
+
+```json
+{
+  "persistState": true,
+  "active": true,
+  "serviceTier": "priority",
+  "additionalSupportedModels": [
+    "openai/example-new-model",
+    "openai-codex/example-new-model"
+  ]
+}
+```
+
+Replace these example IDs with real model IDs. This only allows service-tier use; it does not register models in Pi. Verify the model's tier availability and Pi's pricing support first: discovery alone does not guarantee either. Wildcards are not supported.
+
+The effective list is `supportedModels` (or package defaults if omitted) plus `additionalSupportedModels`, with duplicates removed. Project fields replace the corresponding global fields, rather than concatenating arrays. Set project `additionalSupportedModels: []` to clear inherited additions; omit it to inherit them. `supportedModels: []` empties the base list but still permits explicitly configured additions.
 
 ## Supported providers/APIs
 
