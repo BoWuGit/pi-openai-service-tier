@@ -26,7 +26,7 @@ So Pi gets both the OpenAI request field and the matching Pi-side service-tier c
 - `/openai-tier` selects `priority`, `flex`, `default`, `auto`, or `scale`.
 - Works with Pi's OpenAI Responses and OpenAI Codex Responses providers.
 - Avoids sending tiers that a provider does not support.
-- Includes `gpt-5.4`, `gpt-5.5`, the `gpt-5.6` Luna/Sol/Terra models, and `gpt-6-astra` on OpenAI/Codex by default.
+- Includes `gpt-5.4`, `gpt-5.5`, the `gpt-5.6` Luna/Sol/Terra models, and the `gpt-6` Astra/Sol/Luna models on OpenAI/Codex by default.
 - Preserves Pi's dynamically refreshed OpenAI and OpenAI Codex model catalogs.
 - Does **not** change model, reasoning level, prompts, tools, or `text.verbosity`.
 - Does **not** make network calls of its own.
@@ -138,7 +138,7 @@ Prefer leaving `supportedModels` unset so plugin updates can add verified models
 }
 ```
 
-Replace these example IDs with real model IDs. This only allows service-tier use; it does not register models in Pi. Verify the model's tier availability and Pi's pricing support first: discovery alone does not guarantee either. Wildcards are not supported.
+Replace these example IDs with real model IDs. This only allows service-tier use; it does not register models in Pi. Verify the model's tier availability and Pi's pricing support first: discovery alone does not guarantee either. Wildcards are not supported. New generations and dated snapshots are treated as distinct IDs: add their exact IDs here after verifying support, rather than assuming they inherit the base model's tier availability or pricing. Existing aliases continue to match if their IDs stay unchanged.
 
 The effective list is `supportedModels` (or package defaults if omitted) plus `additionalSupportedModels`, with duplicates removed. Project fields replace the corresponding global fields, rather than concatenating arrays. Set project `additionalSupportedModels: []` to clear inherited additions; omit it to inherit them. `supportedModels: []` empties the base list but still permits explicitly configured additions.
 
@@ -163,7 +163,7 @@ If a tier is configured but unsupported by the current model/provider, the exten
 
 ## Compatibility notes
 
-GPT-6 Astra (`gpt-6-astra`) supports priority/Fast mode on both providers. OpenAI currently excludes Astra Fast mode with EU data residency; use standard processing for those requests. See [OpenAI pricing](https://developers.openai.com/api/docs/pricing).
+GPT-6 Astra, Sol, and Luna (`gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`) are allow-listed for priority/Fast mode on both providers. OpenAI currently permits only Standard processing for these models with EU data residency. See [OpenAI pricing](https://developers.openai.com/api/docs/pricing).
 
 This extension overlays Pi's built-in `openai` and `openai-codex` providers without supplying a `models` array, so Pi's built-in and dynamically refreshed model catalogs remain available. It delegates back to Pi's built-in OpenAI implementations, adding `serviceTier` only for configured/supported OpenAI models.
 

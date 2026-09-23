@@ -119,12 +119,15 @@ test("includes every GPT-5.6 variant for OpenAI and OpenAI Codex", () => {
   }
 });
 
-test("supports GPT-6 Astra priority tier on OpenAI and OpenAI Codex", () => {
+test("supports all verified GPT-6 models on OpenAI and OpenAI Codex", () => {
   const supportedModels = parseModels(DEFAULT_SUPPORTED_MODELS) ?? [];
-  for (const provider of ["openai", "openai-codex"]) {
+  const models = ["openai", "openai-codex"].flatMap((provider) =>
+    ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna"].map((id) => ({ provider, id })),
+  );
+  for (const { provider, id } of models) {
     const model = {
       provider,
-      id: "gpt-6-astra",
+      id,
       api: provider === "openai" ? "openai-responses" : "openai-codex-responses",
     };
     assert.equal(supportsServiceTier(model, supportedModels), true);
@@ -144,6 +147,22 @@ test("supports GPT-6 Astra priority tier on OpenAI and OpenAI Codex", () => {
       resolveServiceTierForModel(model, { active: true, serviceTier: "flex" }, supportedModels),
       provider === "openai" ? "flex" : undefined,
     );
+  }
+});
+
+test("unknown versions require explicit opt-in, including dated snapshots", () => {
+  const defaults = parseModels(DEFAULT_SUPPORTED_MODELS) ?? [];
+  for (const provider of ["openai", "openai-codex"]) {
+    for (const id of ["gpt-6-sol-2099-01-01", "gpt-7-sol"]) {
+      const model = {
+        provider,
+        id,
+        api: provider === "openai" ? "openai-responses" : "openai-codex-responses",
+      };
+      const state = { active: true, serviceTier: "priority" } as const;
+      assert.equal(resolveServiceTierForModel(model, state, defaults), undefined);
+      assert.equal(resolveServiceTierForModel(model, state, [...defaults, { provider, id }]), "priority");
+    }
   }
 });
 

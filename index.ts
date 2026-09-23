@@ -25,20 +25,21 @@ export type ServiceTier = (typeof SERVICE_TIERS)[number];
 const OPENAI_RESPONSES_SERVICE_TIERS = SERVICE_TIERS;
 const OPENAI_CODEX_RESPONSES_SERVICE_TIERS = ["priority"] as const satisfies readonly ServiceTier[];
 
-export const DEFAULT_SUPPORTED_MODELS = [
-  "openai/gpt-5.4",
-  "openai/gpt-5.5",
-  "openai/gpt-5.6-luna",
-  "openai/gpt-5.6-sol",
-  "openai/gpt-5.6-terra",
-  "openai/gpt-6-astra",
-  "openai-codex/gpt-5.4",
-  "openai-codex/gpt-5.5",
-  "openai-codex/gpt-5.6-luna",
-  "openai-codex/gpt-5.6-sol",
-  "openai-codex/gpt-5.6-terra",
-  "openai-codex/gpt-6-astra",
+// Keep verified IDs explicit: new versions may have different tier availability or pricing.
+const DEFAULT_SUPPORTED_MODEL_IDS = [
+  "gpt-5.4",
+  "gpt-5.5",
+  "gpt-5.6-luna",
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+  "gpt-6-astra",
+  "gpt-6-sol",
+  "gpt-6-luna",
 ] as const;
+
+export const DEFAULT_SUPPORTED_MODELS: readonly string[] = ["openai", "openai-codex"].flatMap(
+  (provider) => DEFAULT_SUPPORTED_MODEL_IDS.map((id) => `${provider}/${id}`),
+);
 
 const LEGACY_GENERATED_SUPPORTED_MODELS = [
   ["openai/gpt-5.4", "openai/gpt-5.5", "openai-codex/gpt-5.4", "openai-codex/gpt-5.5"],
